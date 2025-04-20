@@ -3,26 +3,33 @@ name: Deploy Hugging Face App
 on:
   push:
     paths:
-      - 'hf_app/**'
+      - 'hf_app/**'  # ✅ Only trigger when hf_app changes
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
+    - name: Checkout Repo (with LFS support)
+      uses: actions/checkout@v3
+      with:
+        lfs: true  # ✅ Download .pt files tracked with Git LFS
 
-      - name: Set up Git identity
-        run: |
-          git config --global user.email "hussnainkhalil2001@gmail.com"
-          git config --global user.name "rhkraptor"
+    - name: Set up Git identity
+      run: |
+        git config --global user.email "hussnainkhalil2001@gmail.com"
+        git config --global user.name "rhkraptor"
 
-      - name: Push to Hugging Face
-        run: |
-          cd hf_app
-          git init
-          git remote add origin https://huggingface.co/spaces/rhkraptor/BananaOrApple
-          git checkout -b main
-          git add .
-          git commit -m "Auto deploy update from GitHub Actions"
-          git push --force https://rhkraptor:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/rhkraptor/BananaOrApple main
+    - name: Push to Hugging Face
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        cd hf_app
+        git init
+        git branch -m main
+        git remote add origin https://rhkraptor:${HF_TOKEN}@huggingface.co/spaces/rhkraptor/BananaOrApple
+        git add .
+        git commit -m "🚀 Auto deploy update from GitHub Actions"
+        git push -f origin main
