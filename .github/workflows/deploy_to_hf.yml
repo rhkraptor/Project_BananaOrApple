@@ -29,6 +29,8 @@ jobs:
           cd hf_app
           git init
           git lfs install
+          git lfs track "*.pt"
+          git add .gitattributes  # important to track LFS rules
           git checkout -b main
           git remote add origin https://rhkraptor:${HF_TOKEN}@huggingface.co/spaces/rhkraptor/BananaOrApple
           git add .
