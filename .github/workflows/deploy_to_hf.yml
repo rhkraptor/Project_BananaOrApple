@@ -27,10 +27,8 @@ jobs:
           cd hf_app
           git init
           git lfs install
-          git remote add origin https://huggingface.co/spaces/rhkraptor/BananaOrApple
+          git remote add origin https://${{ secrets.HF_TOKEN }}@huggingface.co/spaces/rhkraptor/BananaOrApple
           git checkout -b main
           git add .
           git commit -m "🚀 Auto deploy update from GitHub Actions"
-          git push https://huggingface.co/spaces/rhkraptor/BananaOrApple main --force
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          git push origin main --force
