@@ -14,6 +14,10 @@ Thumbs.db
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
 
+# Ignore dataset
+training/data/
+training/dataset/
+
 # VS Code settings (optional)
 .vscode/
 "@
