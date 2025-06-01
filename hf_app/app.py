@@ -1,13 +1,9 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'training', 'src')))
-
 import gradio as gr
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
-from model import BananaOrAppleClassifier
+from model import BananaOrAppleClassifier  # Now safely local
 
 # Load model
 model = BananaOrAppleClassifier()
@@ -16,7 +12,7 @@ model.eval()
 
 # Class labels
 class_names = ['apple', 'banana', 'other']
-threshold = 0.8  # 80% confidence threshold
+threshold = 0.8  # Only accept prediction if confidence >= 80%
 
 # Image preprocessing
 transform = transforms.Compose([
