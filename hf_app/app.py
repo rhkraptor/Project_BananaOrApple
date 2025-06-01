@@ -1,65 +1,50 @@
+import gradio as gr
 import torch
-import torch.nn as nn
+import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
-import gradio as gr
-import os
+from model import BananaOrAppleClassifier
 
 # Load model
-class BananaOrAppleClassifier(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.model = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Flatten(),
-            nn.Linear(32 * 32 * 32, 128),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(128, 2)
-        )
-
-    def forward(self, x):
-        return self.model(x)
-
-# Initialize and load weights
 model = BananaOrAppleClassifier()
-model_path = os.path.join(os.path.dirname(__file__), "banana_or_apple.pt")
-model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu")))
+model.load_state_dict(torch.load("banana_or_apple.pt", map_location="cpu"))
 model.eval()
 
 # Class labels
-classes = ['apple', 'banana']
+class_names = ['apple', 'banana', 'other']
+threshold = 0.8  # 80% confidence threshold
 
 # Image preprocessing
 transform = transforms.Compose([
     transforms.Resize((128, 128)),
-    transforms.ToTensor()
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
 ])
 
 # Prediction function
-def predict(image):
-    image = Image.fromarray(image).convert("RGB")
-    img_tensor = transform(image).unsqueeze(0)  # Shape: [1, 3, 128, 128]
+def classify_image(img):
+    img_tensor = transform(img).unsqueeze(0)
     with torch.no_grad():
         outputs = model(img_tensor)
-        probs = torch.softmax(outputs, dim=1)
-        confidence, predicted = torch.max(probs, 1)
-        label = classes[predicted.item()]
-        return f"{label} ({confidence.item() * 100:.2f}%)"
+        probs = F.softmax(outputs, dim=1)
+        conf, pred = torch.max(probs, 1)
+        label = class_names[pred.item()]
+        if conf.item() < threshold:
+            label = "❓ unknown"
+        return {c: float(probs[0][i]) for i, c in enumerate(class_names)}, label
 
 # Gradio interface
-interface = gr.Interface(
-    fn=predict,
-    inputs=gr.Image(type="numpy", label="Upload an image of an apple or banana"),
-    outputs=gr.Label(label="Prediction"),
-    title="🍌 Banana or 🍎 Apple Classifier",
-    description="Upload an image to see whether it's a banana or an apple."
+demo = gr.Interface(
+    fn=classify_image,
+    inputs=gr.Image(type="pil"),
+    outputs=[
+        gr.Label(num_top_classes=3, label="Confidence"),
+        gr.Text(label="Predicted Class")
+    ],
+    title="🍌🍎 Banana or Apple or Other?",
+    description="Upload an image of a fruit or something else. The model will predict if it's an apple, banana, or unknown.",
+    examples=["banana.jpg", "apple.jpg", "car.jpg"]
 )
 
 if __name__ == "__main__":
-    interface.launch(share=True)
+    demo.launch(share=True)
