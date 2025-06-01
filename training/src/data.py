@@ -18,13 +18,15 @@ def get_dataloaders(data_dir, batch_size=32, num_workers=2):
 
     # Data augmentation for training set
     train_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    transforms.Resize((128, 128)),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(20),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.02),
+    transforms.RandomAffine(degrees=10, translate=(0.1, 0.1)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
     ])
+
 
     # Basic transform for val/test
     test_val_transform = transforms.Compose([
