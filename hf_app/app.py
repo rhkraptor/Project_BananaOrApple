@@ -42,9 +42,9 @@ demo = gr.Interface(
         gr.Text(label="Predicted Class")
     ],
     title="🍌🍎 Banana or Apple or Other?",
-    description="Upload an image of a fruit or something else. The model will predict if it's an apple, banana, or unknown.",
-    examples=["banana.jpg", "apple.jpg", "car.jpg"]
+    description="Upload an image of a fruit or something else. The model will predict if it's an apple, banana, or unknown."
 )
+
 
 if __name__ == "__main__":
     demo.launch(share=True)
