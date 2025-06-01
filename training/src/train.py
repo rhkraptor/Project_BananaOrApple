@@ -1,69 +1,93 @@
 import os
+import time
 import torch
-from torch import nn, optim
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+import torch.nn as nn
+import torch.optim as optim
 from model import BananaOrAppleClassifier
+from data import get_dataloaders
 
-# ---- Hyperparameters ----
-BATCH_SIZE = 32
-EPOCHS = 20
-LEARNING_RATE = 0.001
-IMG_SIZE = 128
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def main():
+    # Parameters
+    EPOCHS = 100
+    BATCH_SIZE = 32
+    PATIENCE = 15
+    LEARNING_RATE = 1e-4
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# ---- Data Transformations ----
-transform = transforms.Compose([
-    transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    transforms.ToTensor()
-])
+    # Load data
+    data_dir = os.path.join(os.path.dirname(__file__), "..", "dataset")
+    train_loader, val_loader, _ = get_dataloaders(data_dir, batch_size=BATCH_SIZE)
 
-# ---- Load Dataset ----
-base_dir = os.path.join(os.path.dirname(__file__), '..', 'dataset')
+    # Initialize model, loss, optimizer
+    model = BananaOrAppleClassifier().to(DEVICE)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-train_data = datasets.ImageFolder(os.path.join(base_dir, 'train'), transform=transform)
-val_data   = datasets.ImageFolder(os.path.join(base_dir, 'val'), transform=transform)
+    best_val_acc = 0
+    epochs_no_improve = 0
 
-train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
-val_loader   = DataLoader(val_data, batch_size=BATCH_SIZE)
+    print()
+    for epoch in range(EPOCHS):
+        start_time = time.time()
 
-# ---- Model, Loss, Optimizer ----
-model = BananaOrAppleClassifier().to(DEVICE)
-loss_fn = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+        model.train()
+        running_loss, correct, total = 0.0, 0, 0
+        for images, labels in train_loader:
+            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item() * images.size(0)
+            _, predicted = outputs.max(1)
+            correct += predicted.eq(labels).sum().item()
+            total += labels.size(0)
 
-# ---- Training Loop ----
-for epoch in range(EPOCHS):
-    model.train()
-    total_loss, correct = 0, 0
-    for imgs, labels in train_loader:
-        imgs, labels = imgs.to(DEVICE), labels.to(DEVICE)
-        preds = model(imgs)
-        loss = loss_fn(preds, labels)
+        train_loss = running_loss / total
+        train_acc = correct / total
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        # Validation
+        model.eval()
+        val_correct, val_total = 0, 0
+        with torch.no_grad():
+            for images, labels in val_loader:
+                images, labels = images.to(DEVICE), labels.to(DEVICE)
+                outputs = model(images)
+                _, predicted = outputs.max(1)
+                val_correct += predicted.eq(labels).sum().item()
+                val_total += labels.size(0)
 
-        total_loss += loss.item()
-        correct += (preds.argmax(1) == labels).sum().item()
+        val_acc = val_correct / val_total
 
-    acc = correct / len(train_loader.dataset)
+        # Fit diagnosis
+        if train_acc < 0.7 and val_acc < 0.7:
+            status = "⚠️ Underfitting"
+        elif train_acc > 0.85 and (train_acc - val_acc) > 0.15:
+            status = "⚠️ Overfitting"
+        elif val_acc > 0.8:
+            status = "✅ Good fit"
+        else:
+            status = "🟡 Needs tuning"
 
-    # ---- Validation ----
-    model.eval()
-    val_correct = 0
-    with torch.no_grad():
-        for imgs, labels in val_loader:
-            imgs, labels = imgs.to(DEVICE), labels.to(DEVICE)
-            preds = model(imgs)
-            val_correct += (preds.argmax(1) == labels).sum().item()
-    val_acc = val_correct / len(val_loader.dataset)
+        # Time per epoch
+        epoch_time = time.time() - start_time
 
-    print(f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {total_loss:.3f} | Train Acc: {acc:.2%} | Val Acc: {val_acc:.2%}")
+        # Print summary
+        print(f"Epoch {epoch+1}/{EPOCHS} | ⏱ {epoch_time:.1f}s | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val Acc: {val_acc*100:.2f}% | {status}")
 
-# ---- Save Model ----
-model_path = os.path.join(os.path.dirname(__file__), '..', '..', 'hf_app', 'banana_or_apple.pt')
-torch.save(model.state_dict(), model_path)
-print(f"\n✅ Model saved to: {model_path}")
-# ---- End of Training ----
+        # Early stopping
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            epochs_no_improve = 0
+            torch.save(model.state_dict(), os.path.join(os.path.dirname(__file__), "..", "..", "hf_app", "banana_or_apple.pt"))
+        else:
+            epochs_no_improve += 1
+            if epochs_no_improve >= PATIENCE:
+                print(f"⏹️ Early stopping triggered at epoch {epoch+1}")
+                break
+
+    print(f"✅ Final model saved to: hf_app/banana_or_apple.pt")
+
+if __name__ == "__main__":
+    main()
