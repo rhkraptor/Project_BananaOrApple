@@ -1,23 +1,19 @@
+import torch
 import torch.nn as nn
+import torchvision.models as models
 
 class BananaOrAppleClassifier(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),  # 16 x 64 x 64
-
-            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),  # 32 x 32 x 32
-
-            nn.Flatten(),
-            nn.Linear(32 * 32 * 32, 128),
+        self.base_model = models.resnet18(pretrained=True)
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+        self.base_model.fc = nn.Sequential(
+            nn.Linear(self.base_model.fc.in_features, 128),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(128, 3)  # 3 output classes: apple, banana, other
+            nn.Linear(128, 3)  # 3 output classes
         )
 
     def forward(self, x):
-        return self.model(x)
+        return self.base_model(x)

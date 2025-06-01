@@ -18,6 +18,10 @@ Thumbs.db
 training/data/
 training/dataset/
 
+# Ignore .gradio
+
+hf_app/.gradio/
+
 # VS Code settings (optional)
 .vscode/
 "@

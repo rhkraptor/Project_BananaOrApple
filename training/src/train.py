@@ -1,93 +1,129 @@
-import os
-import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader
+from torchvision import transforms
 from model import BananaOrAppleClassifier
 from data import get_dataloaders
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import time
 
+# Full trainer with timing, patience, overfitting check, and confusion matrix saving
 def main():
-    # Parameters
-    EPOCHS = 100
-    BATCH_SIZE = 32
-    PATIENCE = 15
-    LEARNING_RATE = 1e-4
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    data_dir = "../dataset"  # Adjust if needed
 
-    # Load data
-    data_dir = os.path.join(os.path.dirname(__file__), "..", "dataset")
-    train_loader, val_loader, _ = get_dataloaders(data_dir, batch_size=BATCH_SIZE)
+    # Transforms
+    train_transform = transforms.Compose([
+        transforms.Resize((128, 128)),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomRotation(degrees=15),
+        transforms.RandomPerspective(distortion_scale=0.5, p=0.3),
+        transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)),
+        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3),
+        transforms.RandomGrayscale(p=0.1),
+        transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
 
-    # Initialize model, loss, optimizer
-    model = BananaOrAppleClassifier().to(DEVICE)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    val_transform = transforms.Compose([
+        transforms.Resize((128, 128)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
 
-    best_val_acc = 0
-    epochs_no_improve = 0
+    # Loaders
+    train_loader, val_loader, _ = get_dataloaders(data_dir, train_transform, val_transform, batch_size=32, num_workers=0)
 
-    print()
-    for epoch in range(EPOCHS):
+    # Model setup
+    model = BananaOrAppleClassifier()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
+    # Loss and optimizer
+    class_weights = torch.tensor([1.0, 1.0, 1.0]).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    best_val_acc = 0.0
+    patience = 25
+    patience_counter = 0
+
+    all_y_true, all_y_pred = [], []
+
+    for epoch in range(100):
         start_time = time.time()
-
         model.train()
         running_loss, correct, total = 0.0, 0, 0
+
         for images, labels in train_loader:
-            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item() * images.size(0)
-            _, predicted = outputs.max(1)
-            correct += predicted.eq(labels).sum().item()
+            _, predicted = torch.max(outputs, 1)
+            correct += (predicted == labels).sum().item()
             total += labels.size(0)
 
-        train_loss = running_loss / total
         train_acc = correct / total
 
-        # Validation
         model.eval()
         val_correct, val_total = 0, 0
+        y_true, y_pred = [], []
+
         with torch.no_grad():
             for images, labels in val_loader:
-                images, labels = images.to(DEVICE), labels.to(DEVICE)
+                images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
-                _, predicted = outputs.max(1)
-                val_correct += predicted.eq(labels).sum().item()
+                _, predicted = torch.max(outputs, 1)
+                val_correct += (predicted == labels).sum().item()
                 val_total += labels.size(0)
+                y_true += labels.cpu().tolist()
+                y_pred += predicted.cpu().tolist()
 
         val_acc = val_correct / val_total
+        end_time = time.time()
+        print(f"Epoch {epoch+1} | ⏱️ {end_time - start_time:.2f}s | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
 
-        # Fit diagnosis
-        if train_acc < 0.7 and val_acc < 0.7:
-            status = "⚠️ Underfitting"
-        elif train_acc > 0.85 and (train_acc - val_acc) > 0.15:
-            status = "⚠️ Overfitting"
-        elif val_acc > 0.8:
-            status = "✅ Good fit"
-        else:
-            status = "🟡 Needs tuning"
+        acc_diff = abs(train_acc - val_acc)
+        if train_acc > 0.85 and val_acc < 0.75:
+            print("⚠️ Potential overfitting: training high, validation low")
+        elif train_acc < 0.6 and val_acc < 0.6:
+            print("⚠️ Likely underfitting: model not learning enough")
 
-        # Time per epoch
-        epoch_time = time.time() - start_time
-
-        # Print summary
-        print(f"Epoch {epoch+1}/{EPOCHS} | ⏱ {epoch_time:.1f}s | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val Acc: {val_acc*100:.2f}% | {status}")
-
-        # Early stopping
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            epochs_no_improve = 0
-            torch.save(model.state_dict(), os.path.join(os.path.dirname(__file__), "..", "..", "hf_app", "banana_or_apple.pt"))
+            patience_counter = 0
+            torch.save(model.state_dict(), "../../hf_app/banana_or_apple.pt")
+            print("✅ Saved best model")
         else:
-            epochs_no_improve += 1
-            if epochs_no_improve >= PATIENCE:
-                print(f"⏹️ Early stopping triggered at epoch {epoch+1}")
+            patience_counter += 1
+            if patience_counter >= patience:
+                print("🛑 Early stopping")
                 break
 
-    print(f"✅ Final model saved to: hf_app/banana_or_apple.pt")
+        # Save labels for confusion matrix later
+        all_y_true = y_true
+        all_y_pred = y_pred
+
+    # Confusion Matrix
+    cm = confusion_matrix(all_y_true, all_y_pred)
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt='d', xticklabels=['Apple', 'Banana', 'Other'], yticklabels=['Apple', 'Banana', 'Other'])
+    plt.title("Confusion Matrix")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.tight_layout()
+    os.makedirs("../../hf_app", exist_ok=True)
+    plt.savefig("../../hf_app/confusion_matrix.png")
+    plt.show()
 
 if __name__ == "__main__":
     main()
+
