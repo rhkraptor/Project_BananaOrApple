@@ -15,9 +15,8 @@ model = BananaOrAppleClassifier()
 model.load_state_dict(torch.load("banana_or_apple.pt", map_location="cpu"))
 model.eval()
 
-# ✅ Class labels and threshold
+# ✅ Class labels
 class_names = ['apple', 'banana', 'other']
-threshold = 0.8  # Accept prediction only if confidence ≥ 80%
 
 # ✅ Image preprocessing
 transform = transforms.Compose([
@@ -26,7 +25,7 @@ transform = transforms.Compose([
     transforms.Normalize((0.5,), (0.5,))
 ])
 
-# ✅ Prediction function with safe temp file handling (Windows fix)
+# ✅ Prediction function (no threshold rejection anymore)
 def classify_image(img):
     # Re-save to avoid PermissionError (especially on Windows)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
@@ -39,8 +38,6 @@ def classify_image(img):
         probs = F.softmax(outputs, dim=1)
         conf, pred = torch.max(probs, 1)
         label = class_names[pred.item()]
-        if conf.item() < threshold:
-            label = "❓ unknown"
         return {c: float(probs[0][i]) for i, c in enumerate(class_names)}, label
 
 # ✅ Gradio interface
@@ -52,7 +49,7 @@ demo = gr.Interface(
         gr.Text(label="Predicted Class")
     ],
     title="🍌🍎 Banana or Apple or Other?",
-    description="Upload an image of a fruit or something else. The model will predict if it's an apple, banana, or unknown."
+    description="Upload an image of a fruit or something else. The model will predict if it's an apple, banana, or other."
 )
 
 # ✅ Launch app
