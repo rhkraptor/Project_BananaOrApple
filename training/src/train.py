@@ -46,15 +46,19 @@ def main():
     # Loss and optimizer
     class_weights = torch.tensor([1.0, 1.0, 1.0]).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
+
+    # 🔁 NEW: Add scheduler
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5, verbose=True)
+
 
     best_val_acc = 0.0
-    patience = 25
+    patience = 40
     patience_counter = 0
 
     all_y_true, all_y_pred = [], []
 
-    for epoch in range(100):
+    for epoch in range(150):
         start_time = time.time()
         model.train()
         running_loss, correct, total = 0.0, 0, 0
@@ -90,6 +94,11 @@ def main():
         val_acc = val_correct / val_total
         end_time = time.time()
         print(f"Epoch {epoch+1} | ⏱️ {end_time - start_time:.2f}s | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+        
+        
+        # 📉 NEW: Adjust LR based on validation performance
+        scheduler.step(val_acc)
+
 
         acc_diff = abs(train_acc - val_acc)
         if train_acc > 0.85 and val_acc < 0.75:
