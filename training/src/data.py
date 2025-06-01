@@ -16,11 +16,21 @@ def get_dataloaders(data_dir, batch_size=32, num_workers=2):
         tuple: train_loader, val_loader, test_loader
     """
 
-    # Common transform for all sets
-    common_transform = transforms.Compose([
-        transforms.Resize((128, 128)),           # Resize all images to 128x128
-        transforms.ToTensor(),                   # Convert PIL images to tensors
-        transforms.Normalize((0.5,), (0.5,))     # Normalize (mean=0.5, std=0.5) for all channels
+    # Data augmentation for training set
+    train_transform = transforms.Compose([
+        transforms.Resize((128, 128)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+
+    # Basic transform for val/test
+    test_val_transform = transforms.Compose([
+        transforms.Resize((128, 128)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
     # Paths to subfolders
@@ -29,9 +39,9 @@ def get_dataloaders(data_dir, batch_size=32, num_workers=2):
     test_path = os.path.join(data_dir, 'test')
 
     # ImageFolder datasets
-    train_dataset = datasets.ImageFolder(train_path, transform=common_transform)
-    val_dataset = datasets.ImageFolder(val_path, transform=common_transform)
-    test_dataset = datasets.ImageFolder(test_path, transform=common_transform)
+    train_dataset = datasets.ImageFolder(train_path, transform=train_transform)
+    val_dataset = datasets.ImageFolder(val_path, transform=test_val_transform)
+    test_dataset = datasets.ImageFolder(test_path, transform=test_val_transform)
 
     # Dataloaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
