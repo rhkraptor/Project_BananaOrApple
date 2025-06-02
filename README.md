@@ -7,7 +7,7 @@ It uses a fine-tuned **ResNet18** model built with **PyTorch**, features real-ti
 
 ## 🚀 Live Demo
 🔗 Try the classifier on **Hugging Face Spaces**:  
-👉 [https://huggingface.co/spaces/your_username/BananaOrApple](#) *(replace with real URL once deployed)*
+👉 [https://huggingface.co/spaces/rhkraptor/BananaOrApple]
 
 ---
 
