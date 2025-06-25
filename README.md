@@ -23,7 +23,7 @@ The dataset used for training and validation is available here:
 
 - **Architecture**: ResNet18 backbone with a custom classification head
 - **Framework**: PyTorch
-- **Validation Accuracy**: ~97%
+- **Validation Accuracy**: ~94%
 - **Techniques Used**:
   - Data augmentation
   - Early stopping
