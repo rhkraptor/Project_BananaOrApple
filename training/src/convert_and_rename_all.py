@@ -16,13 +16,13 @@ def convert_and_rename(folder_path):
                 rgb_img = img.convert("RGB")  # Convert to RGB if needed
                 rgb_img.save(new_path, "JPEG")
         except Exception as e:
-            print(f"❌ Error converting {old_path}: {e}")
+            print(f" Error converting {old_path}: {e}")
             continue
 
         if old_path != new_path:
             os.remove(old_path)  # Remove old file if name/format changed
 
-        print(f"✅ Saved: {new_name}")
+        print(f" Saved: {new_name}")
 
 # Paths
 base_dir = "training/data"
@@ -31,7 +31,7 @@ folders = ["apple", "banana", "other"]
 for folder in folders:
     folder_path = os.path.join(base_dir, folder)
     if os.path.isdir(folder_path):
-        print(f"\n📂 Processing {folder_path}")
+        print(f"\n Processing {folder_path}")
         convert_and_rename(folder_path)
     else:
-        print(f"⚠️ Skipped missing folder: {folder_path}")
+        print(f" Skipped missing folder: {folder_path}")

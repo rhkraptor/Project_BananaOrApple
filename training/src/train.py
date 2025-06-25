@@ -44,21 +44,21 @@ def main():
     model.to(device)
 
     # Loss and optimizer
-    class_weights = torch.tensor([1.0, 1.0, 1.0]).to(device)
+    class_weights = torch.tensor([1.0, 1.0, 0.8]).to(device)   # Adjust weights for class imbalance
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
 
-    # 🔁 NEW: Add scheduler
+    #  NEW: Add scheduler
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5, verbose=True)
 
 
     best_val_acc = 0.0
-    patience = 40
+    patience = 30
     patience_counter = 0
 
     all_y_true, all_y_pred = [], []
 
-    for epoch in range(150):
+    for epoch in range(100):
         start_time = time.time()
         model.train()
         running_loss, correct, total = 0.0, 0, 0
@@ -93,28 +93,28 @@ def main():
 
         val_acc = val_correct / val_total
         end_time = time.time()
-        print(f"Epoch {epoch+1} | ⏱️ {end_time - start_time:.2f}s | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+        print(f"Epoch {epoch+1} |  {end_time - start_time:.2f}s | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
         
         
-        # 📉 NEW: Adjust LR based on validation performance
+        #  NEW: Adjust LR based on validation performance
         scheduler.step(val_acc)
 
 
         acc_diff = abs(train_acc - val_acc)
         if train_acc > 0.85 and val_acc < 0.75:
-            print("⚠️ Potential overfitting: training high, validation low")
+            print(" Potential overfitting: training high, validation low")
         elif train_acc < 0.6 and val_acc < 0.6:
-            print("⚠️ Likely underfitting: model not learning enough")
+            print(" Likely underfitting: model not learning enough")
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             patience_counter = 0
             torch.save(model.state_dict(), "../../hf_app/banana_or_apple.pt")
-            print("✅ Saved best model")
+            print(" Saved best model")
         else:
             patience_counter += 1
             if patience_counter >= patience:
-                print("🛑 Early stopping")
+                print(" Early stopping")
                 break
 
         # Save labels for confusion matrix later
@@ -129,8 +129,11 @@ def main():
     plt.xlabel("Predicted")
     plt.ylabel("Actual")
     plt.tight_layout()
-    os.makedirs("../../hf_app", exist_ok=True)
-    plt.savefig("../../hf_app/confusion_matrix.png")
+
+    # Save in project root
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    save_path = os.path.join(root_dir, "confusion_matrix.png")
+    plt.savefig(save_path)
     plt.show()
 
 if __name__ == "__main__":
