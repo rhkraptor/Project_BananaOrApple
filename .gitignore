@@ -17,6 +17,7 @@ Thumbs.db
 # Ignore dataset
 training/data/
 training/dataset/
+training/comparison_model/
 
 # Ignore .gradio
 
