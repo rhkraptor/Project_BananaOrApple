@@ -1,6 +1,5 @@
 ---
 title: Banana or Apple Classifier
-emoji: 🍌|🍎
 colorFrom: yellow
 colorTo: red
 sdk: gradio
