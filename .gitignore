@@ -17,7 +17,8 @@ Thumbs.db
 # Ignore dataset & comparison model directories
 training/data/
 training/dataset/
-
+training/comparison_model/
+training/notebooks/train_for_model2.ipynb/
 
 
 # Ignore .gradio
